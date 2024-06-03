@@ -1,5 +1,5 @@
 ---
-title: "R Notebook"
+title: "Antibiotic and Metal Resistance Gene Biogeography"
 output: html_notebook
 ---
 
@@ -12,6 +12,7 @@ library(ggpubr)
 library(ggplot2)
 library(cowplot)
 library(EnvStats)
+library(Hmisc)
 ```
 
 
@@ -102,5 +103,53 @@ Lead_Plot <- ggboxplot(data=mebbe_types,x="Biome",y="Lead.Pb.", title = "Total L
 Gridded_Plot <- plot_grid(Mercury_Plot, Iron_Plot, Lead_Plot, labels="AUTO")
 Gridded_Plot
 ```
+# Part 2: Pairwise Correlation Analysis 
+
+
+
+```{r}
+### We're gonna use a different data file here. Instead of the types, we're interested in the correlations of specific genes (i.e the sequence level of analysis rather than the gene families they associate with)
+
+mebbe <- read.csv(file="../Desktop/Final_thesis_figures/Final_Subtype_File_normalizedforseqdepth.csv", header=TRUE, row.names=1)
+```
+
+```{r}
+### We do spearman rank pairwise correlation analysis of all the genes across all aquatic environments because the data is non-parametric. I'm expecting two important metrics from this: a p-value and the correlation coefficient, R2
+spearman_corr_matrix_gene_seqdepthnorm <-  rcorr(as.matrix(mebbe[8:ncol(mebbe)]), type="spearman")
+
+correlation_dataframe_seqdepthnorm_spearman <- spearman_corr_matrix_gene_seqdepthnorm$r
+
+### Eventually, we're gonna use this data to construct networks. But, the input for network analysis is an ABC table, not a matrix, so we will need to flatten it first using the function defined below. The input is the correlation matrix and the p-value matrix after the correlation completes.
+
+flattenCorrMatrix <- function(cormat, pmat) {
+  ut <- upper.tri(cormat)
+  data.frame(
+    row = rownames(cormat)[row(cormat)[ut]],
+    column = rownames(cormat)[col(cormat)[ut]],
+    cor = cormat[ut],
+    p_value = pmat[ut]
+  )
+}
+```
+```{r}
+## I want to adjust the p-value to control for the false discovery rate, since there is a high likelihood that we obtain a significant p-value just from the number of comparisons made here (nearly 1.4 million!!!). We're gonna attach that back to the data table as the adjusted p-value for the networks later on. 
+multiple_comparisons_pmatrix_BH <- p.adjust(spearman_corr_matrix_gene_seqdepthnorm$P, method="BH")
+```
+```{r}
+## flatten the matrix now, and then write the output as a CSV for later. It's hashed so R Studio doesn't throw a fit! We'll look at the first 6 entries
+
+combined_p_r_seqdepthnorm_BH <- flattenCorrMatrix(spearman_corr_matrix_gene_seqdepthnorm$r,multiple_comparisons_pmatrix_BH)
+#write.csv(combined_p_r_seqdepthnorm_BH, "Spearman_corr_table_normseqdepth_BH.csv")
+
+head(combined_p_r_seqdepthnorm_BH)
+```
+
+
+
+
+
+
+
+
 
 
