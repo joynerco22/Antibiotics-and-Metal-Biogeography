@@ -3,6 +3,13 @@ title: "Antibiotic and Metal Resistance Gene Biogeography"
 output: html_notebook
 ---
 
+
+<center>
+
+![Global Map of Projects Included in Analysis](GitHub/Antibiotics-and-Metal-Biogeography/docs/assets/map.png)
+
+</center> 
+
 # Part 1: Data Plots
 
 
