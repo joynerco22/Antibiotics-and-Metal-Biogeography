@@ -1,0 +1,155 @@
+---
+title: "Antibiotic and Metal Resistance Gene Biogeography"
+output: html_notebook
+---
+
+# Part 1: Data Plots
+
+
+
+```{r}
+library(ggpubr)
+library(ggplot2)
+library(cowplot)
+library(EnvStats)
+library(Hmisc)
+```
+
+
+```{r}
+## Read in the data. This file is the "type" file, and the gene family abundances are normalized against the total library size. The columns correspond to the gene and the rows the samples. Samples are sequencing libraries downloaded from MG-RAST and the SRA. 
+
+mebbe_types <- read.csv("~/../Desktop/Final_thesis_figures/Final_Type_File_normalizedforseqdepth.csv", header=TRUE,row.names=1)
+
+## Create a character vector storing all of the gene families of interest. There are 8 metals and 8 antibiotics visualized.
+
+genes <- c("Mercury.Hg.", "Iron.Fe.","Lead.Pb.", "Cadmium.Cd.", "Arsenic.As.","Copper.Cu.", "Zinc.Zn.","Chromium.Cr.", "multidrug", "vancomycin", "sulfonamide", "tetracycline", "bacitracin", "polymyxin","beta_lactam", "aminoglycoside")
+
+## empty plot list to store the plots so i can print them all at once
+plot_list <- list()
+
+## initialize the for loop, just replacing the y variable with the character vector
+for (gene in genes) {
+  p <- ggboxplot(data = mebbe_types,
+                 x = "Biome",
+                 y = gene,
+                 title = paste(gene, "Resistance Gene"),
+                 fill = "Biome",
+                 palette = c("#00AFBB", "#E7B800", "#FC4E07", "#456990", "#94778B", "#82C09A")) +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    scale_y_continuous(trans = 'log10') +
+    theme(legend.position = "none")
+  
+  # Add the plot to the list
+  plot_list[[gene]] <- p
+}
+
+# display the plots
+for (gene in genes) {
+  print(plot_list[[gene]])
+}
+```
+
+```{r}
+### These plots look good, but we can add some other things to some of them to make them a little more informative. Let's add the sample size of the projects that were used to construct each boxplot and then run some significance testing. 
+
+### A few justifications here:
+
+### - The values are incredibly small because of the normalization against the total library size, so the y-axis is log10 scaled for visualization.
+### - I opted to run both a Kruskal-Wallis ANOVA and Wilcox Test because I had 50+ groupings to assess significance in, so the Kruskal-Wallis global p-value helped to isolate certain comparisons of interest to follow up with a wilcox test to understand which direction the significance is in.
+
+### - The hypothesis being tested for the Wilcox test will be different depending on the method.arg passed to the function and the order in which the comparisons are created. For example, if the character vector specifies a contrast of "Marine v. Estuary", then a significant p-value (<0.05) with the alternative hypothesis being "less", suggests that marine environments are significantly less abundant in that gene type.
+
+### Here are the character contrasts utilized for the hypothesis test
+my_comparisons <- list( c("Marine", "Estuary"), c("Marine", "Freshwater"), c("Freshwater", "Estuary") )
+
+
+Iron_Plot <- ggboxplot(data=mebbe_types,x="Biome",y="Iron.Fe.", title = "Total Iron", fill = "Biome", palette = c("#00AFBB", "#E7B800", "#FC4E07")) + theme(plot.title=element_text(hjust = 0.5))+ yscale("log10")+ ylab("Average Integrase / 16s gene copy") + stat_n_text( #we can specify where in y axis the samle size should be denoted
+    color = "black", #choose any color
+    text.box = TRUE, #draws a box outside the n,
+    size=5,
+    y.pos=log(1e-6)
+    
+  )+ theme(legend.position = "none") + stat_compare_means(method="kruskal") + stat_compare_means(method="wilcox", method.args=list(alternative="less"), comparisons=my_comparisons) + stat_summary(fun=mean, shape=18, linewidth=40, size=1, colour="black")
+
+Iron_Plot
+
+### so within this, we now more information about the direction and abundance of certain gene types within these environments.
+```
+```{r}
+
+### Let's make a few more plots and combine them into one grob object.
+
+
+Mercury_Plot <- ggboxplot(data=mebbe_types,x="Biome",y="Mercury.Hg.", title = "Total Mercury", fill = "Biome", palette = c("#00AFBB", "#E7B800", "#FC4E07")) + theme(plot.title=element_text(hjust = 0.5))+ yscale("log10")+ ylab("Average Integrase / 16s gene copy") + stat_n_text( #we can specify where in y axis the samle size should be denoted
+    color = "black", #choose any color
+    text.box = TRUE, #draws a box outside the n,
+    size=5,
+    y.pos=log(1e-6)
+    
+  )+ theme(legend.position = "none") + stat_compare_means(method="kruskal") + stat_compare_means(method="wilcox", method.args=list(alternative="less"), comparisons=my_comparisons) + stat_summary(fun=mean, shape=18, linewidth=40, size=1, colour="black")
+
+Lead_Plot <- ggboxplot(data=mebbe_types,x="Biome",y="Lead.Pb.", title = "Total Lead", fill = "Biome", palette = c("#00AFBB", "#E7B800", "#FC4E07")) + theme(plot.title=element_text(hjust = 0.5))+ yscale("log10")+ ylab("Average Integrase / 16s gene copy") + stat_n_text( #we can specify where in y axis the samle size should be denoted
+    color = "black", #choose any color
+    text.box = TRUE, #draws a box outside the n,
+    size=5,
+    y.pos=log(1e-6)
+    
+  )+ theme(legend.position = "none") + stat_compare_means(method="kruskal") + stat_compare_means(method="wilcox", method.args=list(alternative="less"), comparisons=my_comparisons) + stat_summary(fun=mean, shape=18, linewidth=40, size=1, colour="black")
+```
+```{r, fig.height=20,fig.width=20}
+### We're gonna use cowplot to label the figures side by side for now. 
+
+Gridded_Plot <- plot_grid(Mercury_Plot, Iron_Plot, Lead_Plot, labels="AUTO")
+Gridded_Plot
+```
+# Part 2: Pairwise Correlation Analysis 
+
+
+
+```{r}
+### We're gonna use a different data file here. Instead of the types, we're interested in the correlations of specific genes (i.e the sequence level of analysis rather than the gene families they associate with)
+
+mebbe <- read.csv(file="../Desktop/Final_thesis_figures/Final_Subtype_File_normalizedforseqdepth.csv", header=TRUE, row.names=1)
+```
+
+```{r}
+### We do spearman rank pairwise correlation analysis of all the genes across all aquatic environments because the data is non-parametric. I'm expecting two important metrics from this: a p-value and the correlation coefficient, R2
+spearman_corr_matrix_gene_seqdepthnorm <-  rcorr(as.matrix(mebbe[8:ncol(mebbe)]), type="spearman")
+
+correlation_dataframe_seqdepthnorm_spearman <- spearman_corr_matrix_gene_seqdepthnorm$r
+
+### Eventually, we're gonna use this data to construct networks. But, the input for network analysis is an ABC table, not a matrix, so we will need to flatten it first using the function defined below. The input is the correlation matrix and the p-value matrix after the correlation completes.
+
+flattenCorrMatrix <- function(cormat, pmat) {
+  ut <- upper.tri(cormat)
+  data.frame(
+    row = rownames(cormat)[row(cormat)[ut]],
+    column = rownames(cormat)[col(cormat)[ut]],
+    cor = cormat[ut],
+    p_value = pmat[ut]
+  )
+}
+```
+```{r}
+## I want to adjust the p-value to control for the false discovery rate, since there is a high likelihood that we obtain a significant p-value just from the number of comparisons made here (nearly 1.4 million!!!). We're gonna attach that back to the data table as the adjusted p-value for the networks later on. 
+multiple_comparisons_pmatrix_BH <- p.adjust(spearman_corr_matrix_gene_seqdepthnorm$P, method="BH")
+```
+```{r}
+## flatten the matrix now, and then write the output as a CSV for later. It's hashed so R Studio doesn't throw a fit! We'll look at the first 6 entries
+
+combined_p_r_seqdepthnorm_BH <- flattenCorrMatrix(spearman_corr_matrix_gene_seqdepthnorm$r,multiple_comparisons_pmatrix_BH)
+#write.csv(combined_p_r_seqdepthnorm_BH, "Spearman_corr_table_normseqdepth_BH.csv")
+
+head(combined_p_r_seqdepthnorm_BH)
+```
+
+
+
+
+
+
+
+
+
+
